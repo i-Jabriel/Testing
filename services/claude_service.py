@@ -1,7 +1,7 @@
 """
-Claude AI service for natural language task extraction.
+AI service for natural language task extraction using OpenAI GPT-4o.
 Supports Arabic, English, and mixed (code-switched) input.
-Also handles image OCR via Claude Vision.
+Also handles image OCR via GPT-4o Vision.
 """
 import json
 import re
@@ -9,13 +9,13 @@ import base64
 import logging
 from datetime import date
 
-import anthropic
+from openai import OpenAI
 
-from config import ANTHROPIC_API_KEY
+from config import OPENAI_API_KEY
 
 logger = logging.getLogger(__name__)
 
-client = anthropic.Anthropic(api_key=ANTHROPIC_API_KEY)
+client = OpenAI(api_key=OPENAI_API_KEY)
 
 TASK_EXTRACTION_PROMPT = """\
 You are an intelligent task extraction assistant.
@@ -50,9 +50,6 @@ Examples:
 
   Input:  "remind me to follow up with Ahmed next week"
   Output: [{"title":"Follow up with Ahmed","priority":"Medium","due_date":"<next Monday>","notes":null}]
-
-Message:
-{message}
 """
 
 IMAGE_TASK_PROMPT = """\
@@ -75,21 +72,15 @@ If no tasks are found, return an empty array: []
 
 
 def _parse_json_response(text: str) -> list:
-    """Robustly extract a JSON array from Claude's response."""
+    """Robustly extract a JSON array from the model's response."""
     text = text.strip()
 
-    # Direct parse
     try:
         return json.loads(text)
     except json.JSONDecodeError:
         pass
 
-    # Strip markdown code fences
-    patterns = [
-        r"```json\s*([\s\S]*?)\s*```",
-        r"```\s*([\s\S]*?)\s*```",
-    ]
-    for pattern in patterns:
+    for pattern in [r"```json\s*([\s\S]*?)\s*```", r"```\s*([\s\S]*?)\s*```"]:
         match = re.search(pattern, text)
         if match:
             try:
@@ -97,7 +88,6 @@ def _parse_json_response(text: str) -> list:
             except json.JSONDecodeError:
                 pass
 
-    # Find first [...] block
     match = re.search(r"\[[\s\S]*\]", text)
     if match:
         try:
@@ -105,13 +95,13 @@ def _parse_json_response(text: str) -> list:
         except json.JSONDecodeError:
             pass
 
-    logger.error("Could not parse JSON from Claude response: %s", text[:500])
+    logger.error("Could not parse JSON from response: %s", text[:500])
     return []
 
 
 def extract_tasks(text: str, source: str = "text") -> list[dict]:
     """
-    Extract structured tasks from a text message using Claude.
+    Extract structured tasks from a text message using GPT-4o.
 
     Args:
         text:   The user's raw message (Arabic, English, or mixed).
@@ -121,20 +111,21 @@ def extract_tasks(text: str, source: str = "text") -> list[dict]:
         List of task dicts with keys: title, priority, due_date, notes, source.
     """
     today = date.today().isoformat()
-    prompt = TASK_EXTRACTION_PROMPT.format(today=today, message=text)
 
-    response = client.messages.create(
-        model="claude-sonnet-4-6",
+    response = client.chat.completions.create(
+        model="gpt-4o",
         max_tokens=1024,
-        messages=[{"role": "user", "content": prompt}],
+        messages=[
+            {"role": "system", "content": TASK_EXTRACTION_PROMPT.format(today=today)},
+            {"role": "user", "content": text},
+        ],
     )
 
-    raw = response.content[0].text
+    raw = response.choices[0].message.content or ""
     tasks = _parse_json_response(raw)
 
     for task in tasks:
         task["source"] = source
-        # Normalise priority casing
         task["priority"] = task.get("priority", "Medium").capitalize()
         if task["priority"] not in ("High", "Medium", "Low"):
             task["priority"] = "Medium"
@@ -145,11 +136,11 @@ def extract_tasks(text: str, source: str = "text") -> list[dict]:
 
 def extract_tasks_from_image(image_bytes: bytes, mime_type: str = "image/jpeg") -> list[dict]:
     """
-    OCR + task extraction from an image using Claude Vision.
+    OCR + task extraction from an image using GPT-4o Vision.
 
     Args:
         image_bytes: Raw bytes of the image file.
-        mime_type:   MIME type of the image (image/jpeg, image/png, etc.).
+        mime_type:   MIME type (image/jpeg, image/png, etc.).
 
     Returns:
         List of task dicts with source='photo'.
@@ -157,19 +148,18 @@ def extract_tasks_from_image(image_bytes: bytes, mime_type: str = "image/jpeg") 
     today = date.today().isoformat()
     image_b64 = base64.standard_b64encode(image_bytes).decode("utf-8")
 
-    response = client.messages.create(
-        model="claude-sonnet-4-6",
+    response = client.chat.completions.create(
+        model="gpt-4o",
         max_tokens=1024,
         messages=[
             {
                 "role": "user",
                 "content": [
                     {
-                        "type": "image",
-                        "source": {
-                            "type": "base64",
-                            "media_type": mime_type,
-                            "data": image_b64,
+                        "type": "image_url",
+                        "image_url": {
+                            "url": f"data:{mime_type};base64,{image_b64}",
+                            "detail": "high",
                         },
                     },
                     {
@@ -181,7 +171,7 @@ def extract_tasks_from_image(image_bytes: bytes, mime_type: str = "image/jpeg") 
         ],
     )
 
-    raw = response.content[0].text
+    raw = response.choices[0].message.content or ""
     tasks = _parse_json_response(raw)
 
     for task in tasks:

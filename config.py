@@ -7,8 +7,7 @@ load_dotenv()
 TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
 TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID")
 
-# AI APIs
-ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY")
+# AI API (GPT-4o for task extraction + vision; Whisper for voice)
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 
 # Notion
@@ -28,7 +27,6 @@ def validate_config():
     required = {
         "TELEGRAM_BOT_TOKEN": TELEGRAM_BOT_TOKEN,
         "TELEGRAM_CHAT_ID": TELEGRAM_CHAT_ID,
-        "ANTHROPIC_API_KEY": ANTHROPIC_API_KEY,
         "OPENAI_API_KEY": OPENAI_API_KEY,
         "NOTION_API_KEY": NOTION_API_KEY,
         "NOTION_DATABASE_ID": NOTION_DATABASE_ID,
