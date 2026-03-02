@@ -1,0 +1,20 @@
+# Telegram bot framework (async, v20+)
+python-telegram-bot==20.7
+
+# Anthropic Claude API
+anthropic==0.34.2
+
+# OpenAI (Whisper voice transcription)
+openai==1.40.0
+
+# Notion API client
+notion-client==2.2.1
+
+# Async-compatible scheduler
+APScheduler==3.10.4
+
+# Environment variable management
+python-dotenv==1.0.1
+
+# Image handling (for MIME type detection)
+Pillow==10.4.0
