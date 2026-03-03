@@ -96,6 +96,7 @@ async def _add_tasks_and_reply(
             or task.get("task_title")
             or "Untitled Task"
         )
+        task["title"] = title  # normalise key so formatters can rely on it
         page_id = add_task(
             title=title,
             priority=task.get("priority", "Medium"),
