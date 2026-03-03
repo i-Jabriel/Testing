@@ -22,6 +22,7 @@ You are an intelligent task extraction assistant.
 
 Analyze the message below and extract all tasks from it.
 The message may be in Arabic, English, or a mix of both (Arabizi / code-switching).
+The user may describe a task directly OR ask you to add/save something — treat both the same: extract the underlying task.
 
 Today's date: {today}
 
@@ -32,6 +33,7 @@ Priority rules:
 
 Due date rules:
 - Convert relative expressions (tomorrow, next week, الخميس…) to ISO 8601 (YYYY-MM-DD) based on today.
+- If a time is mentioned (e.g. "at 10", "at 3pm") put it in the notes field, not due_date.
 - If no due date is mentioned, return null.
 
 Return ONLY a valid JSON array — no markdown fences, no extra text.
@@ -39,7 +41,9 @@ Each element must have exactly these keys:
   "title"    : string  — concise task title in English
   "priority" : string  — "High" | "Medium" | "Low"
   "due_date" : string | null  — "YYYY-MM-DD" or null
-  "notes"    : string | null  — any extra context, or null
+  "notes"    : string | null  — extra context like time or location, or null
+
+If no actionable task can be identified, return an empty array: []
 
 Examples:
   Input:  "اتصل على العميل بكرة"
@@ -50,6 +54,12 @@ Examples:
 
   Input:  "remind me to follow up with Ahmed next week"
   Output: [{"title":"Follow up with Ahmed","priority":"Medium","due_date":"<next Monday>","notes":null}]
+
+  Input:  "I have a task. It's a meeting at 10 with Saudi. Can you put it in my notion?"
+  Output: [{"title":"Meeting with Saudi","priority":"Medium","due_date":null,"notes":"at 10"}]
+
+  Input:  "add to my tasks: call the doctor tomorrow and buy groceries"
+  Output: [{"title":"Call the doctor","priority":"Medium","due_date":"<tomorrow>","notes":null},{"title":"Buy groceries","priority":"Low","due_date":null,"notes":null}]
 """
 
 IMAGE_TASK_PROMPT = """\
