@@ -89,8 +89,15 @@ async def _add_tasks_and_reply(
 
     added: list[dict] = []
     for task in tasks:
+        # GPT sometimes uses "name" or "task_title" instead of "title"
+        title = (
+            task.get("title")
+            or task.get("name")
+            or task.get("task_title")
+            or "Untitled Task"
+        )
         page_id = add_task(
-            title=task["title"],
+            title=title,
             priority=task.get("priority", "Medium"),
             due_date=task.get("due_date"),
             source=task.get("source", "text"),
@@ -147,8 +154,8 @@ async def handle_voice(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
     """Handle voice messages: Whisper transcription → Claude extraction."""
     await update.message.reply_text("🎙️ Transcribing your voice message…")
     try:
-        voice_file = await update.message.voice.get_file()
-        audio_bytes = bytes(await voice_file.download_as_bytearray())
+        voice_file = await update.message.voice.get_file(read_timeout=30, connect_timeout=15)
+        audio_bytes = bytes(await voice_file.download_as_bytearray(read_timeout=60, connect_timeout=15))
 
         transcript = transcribe_voice(audio_bytes, file_extension="ogg")
         await update.message.reply_text(

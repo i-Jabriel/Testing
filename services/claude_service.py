@@ -75,8 +75,15 @@ def _parse_json_response(text: str) -> list:
     """Robustly extract a JSON array from the model's response."""
     text = text.strip()
 
+    def _to_list(parsed) -> list:
+        if isinstance(parsed, list):
+            return parsed
+        if isinstance(parsed, dict):
+            return [parsed]
+        return []
+
     try:
-        return json.loads(text)
+        return _to_list(json.loads(text))
     except json.JSONDecodeError:
         pass
 
@@ -84,14 +91,24 @@ def _parse_json_response(text: str) -> list:
         match = re.search(pattern, text)
         if match:
             try:
-                return json.loads(match.group(1))
+                return _to_list(json.loads(match.group(1)))
             except json.JSONDecodeError:
                 pass
 
     match = re.search(r"\[[\s\S]*\]", text)
     if match:
         try:
-            return json.loads(match.group(0))
+            return _to_list(json.loads(match.group(0)))
+        except json.JSONDecodeError:
+            pass
+
+    # Last resort: if the model returned a single object instead of an array, wrap it
+    match = re.search(r"\{[\s\S]*\}", text)
+    if match:
+        try:
+            obj = json.loads(match.group(0))
+            if isinstance(obj, dict):
+                return [obj]
         except json.JSONDecodeError:
             pass
 
