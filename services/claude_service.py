@@ -133,7 +133,7 @@ def extract_tasks(text: str, source: str = "text") -> list[dict]:
         model="gpt-4o",
         max_tokens=1024,
         messages=[
-            {"role": "system", "content": TASK_EXTRACTION_PROMPT.format(today=today)},
+            {"role": "system", "content": TASK_EXTRACTION_PROMPT.replace("{today}", today)},
             {"role": "user", "content": text},
         ],
     )
@@ -181,7 +181,7 @@ def extract_tasks_from_image(image_bytes: bytes, mime_type: str = "image/jpeg") 
                     },
                     {
                         "type": "text",
-                        "text": IMAGE_TASK_PROMPT.format(today=today),
+                        "text": IMAGE_TASK_PROMPT.replace("{today}", today),
                     },
                 ],
             }
