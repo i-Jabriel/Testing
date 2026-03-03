@@ -27,6 +27,38 @@ logger = logging.getLogger(__name__)
 notion = Client(auth=NOTION_API_KEY)
 
 # ──────────────────────────────────────────────────────────────────────────────
+# Dynamic title property name lookup
+# ──────────────────────────────────────────────────────────────────────────────
+
+_title_prop_name: str | None = None
+
+
+def _get_title_property_name() -> str:
+    """
+    Return the name of the title-type property in the Notion database.
+
+    Notion databases always have exactly one title property, but its *display
+    name* varies: "Title", "Name", "Task name", etc.  This function queries
+    the database schema once, caches the result, and returns the correct name
+    so the code works regardless of how the user named that column.
+    """
+    global _title_prop_name
+    if _title_prop_name is not None:
+        return _title_prop_name
+    try:
+        db = notion.databases.retrieve(database_id=NOTION_DATABASE_ID)
+        for name, prop in db["properties"].items():
+            if prop.get("type") == "title":
+                _title_prop_name = name
+                logger.info("Notion title property detected: %r", name)
+                return name
+    except Exception as exc:
+        logger.warning("Could not retrieve Notion DB schema: %s — falling back to 'Title'", exc)
+    _title_prop_name = "Title"
+    return _title_prop_name
+
+
+# ──────────────────────────────────────────────────────────────────────────────
 # Write operations
 # ──────────────────────────────────────────────────────────────────────────────
 
@@ -45,7 +77,7 @@ def add_task(
         The new page's Notion ID (UUID string).
     """
     properties: dict = {
-        "Title": {
+        _get_title_property_name(): {
             "title": [{"text": {"content": title}}]
         },
         "Priority": {
@@ -171,7 +203,7 @@ def _parse_pages(results: list) -> list[dict]:
         tasks.append(
             {
                 "id": page["id"],
-                "title": _safe_title(props.get("Title", {})),
+                "title": _safe_title(props.get(_get_title_property_name(), {})),
                 "priority": _safe_select(props.get("Priority", {})) or "Medium",
                 "status": _safe_select(props.get("Status", {})) or "To Do",
                 "source": _safe_select(props.get("Source", {})) or "text",
